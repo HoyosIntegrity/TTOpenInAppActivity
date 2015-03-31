@@ -11,6 +11,7 @@
 #import "TTOpenInAppActivity.h"
 #import <MobileCoreServices/MobileCoreServices.h> // For UTI
 #import <ImageIO/ImageIO.h>
+#import <AssetsLibrary/AssetsLibrary.h>
 
 @interface TTOpenInAppActivity () <UIActionSheetDelegate>
 
@@ -68,7 +69,7 @@
 
 - (NSString *)activityType
 {
-	return NSStringFromClass([self class]);
+    return NSStringFromClass([self class]);
 }
 
 - (NSString *)activityTitle
@@ -92,30 +93,37 @@
     NSUInteger count = 0;
     
     for (id activityItem in activityItems) {
-		if ([activityItem isKindOfClass:[NSURL class]] && [(NSURL *)activityItem isFileURL]) {
-			count++;
-		}
+        if ([activityItem isKindOfClass:[NSURL class]] && [(NSURL *)activityItem isFileURL]) {
+            count++;
+        }
+        if ([activityItem isKindOfClass:[NSURL class]] && [[(NSURL *)activityItem scheme] isEqualToString:@"assets-library"]) {
+            count++;
+        }
         if ([activityItem isKindOfClass:[UIImage class]]) {
             count++;
         }
-	}
-	
-	return (count >= 1);
+    }
+    
+    return (count >= 1);
 }
 
 - (void)prepareWithActivityItems:(NSArray *)activityItems
 {
     NSMutableArray *fileURLs = [NSMutableArray array];
     
-	for (id activityItem in activityItems) {
-		if ([activityItem isKindOfClass:[NSURL class]] && [(NSURL *)activityItem isFileURL]) {
+    for (id activityItem in activityItems) {
+        if ([activityItem isKindOfClass:[NSURL class]] && [(NSURL *)activityItem isFileURL]) {
             [fileURLs addObject:activityItem];
-		}
+        }
+        if ([activityItem isKindOfClass:[NSURL class]] && [[(NSURL *)activityItem scheme] isEqualToString:@"assets-library"]) {
+            NSURL *fileUrl = [self localFileURLForAssetUrl:activityItem];
+            [fileURLs addObject:fileUrl];
+        }
         if ([activityItem isKindOfClass:[UIImage class]]) {
             NSURL *imageURL = [self localFileURLForImage:activityItem];
             [fileURLs addObject:imageURL];
         }
-	}
+    }
     
     self.fileURLs = [fileURLs copy];
 }
@@ -269,8 +277,8 @@
     if (buttonIndex != actionSheet.cancelButtonIndex) {
         [self openDocumentInteractionControllerWithFileURL:self.fileURLs[buttonIndex]];
     } else {
-	    // Inform app that the activity has finished
-	    [self activityDidFinish:NO];
+        // Inform app that the activity has finished
+        [self activityDidFinish:NO];
     }
 }
 
@@ -312,6 +320,39 @@
         NSData *data = [NSData dataWithData:UIImageJPEGRepresentation(image, 0.8)];
         [[NSFileManager defaultManager] createFileAtPath:[fileURL path] contents:data attributes:nil];
     }
+    return fileURL;
+}
+
+- (NSURL *)localFileURLForAssetUrl:(NSURL *)assetUrl
+{
+    // save this image to a temp folder
+    NSURL *tmpDirURL = [NSURL fileURLWithPath:NSTemporaryDirectory() isDirectory:YES];
+    NSString *filename = [[NSUUID UUID] UUIDString];
+    NSURL __block *fileURL = nil;
+    
+    dispatch_semaphore_t waitForAssetToBeWritten = dispatch_semaphore_create(0);
+    
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        ALAssetsLibrary *assetLibrary=[[ALAssetsLibrary alloc] init];
+        [assetLibrary assetForURL:assetUrl resultBlock:^(ALAsset *asset) {
+            fileURL = [[tmpDirURL URLByAppendingPathComponent:filename] URLByAppendingPathExtension:[assetUrl pathExtension]];
+            ALAssetRepresentation *rep = [asset defaultRepresentation];
+            Byte *buffer = (Byte*)malloc(rep.size);
+            NSUInteger buffered = [rep getBytes:buffer fromOffset:0 length:rep.size error:nil];
+            NSData *data = [NSData dataWithBytesNoCopy:buffer length:buffered freeWhenDone:YES];//this is NSData may be what you want
+            
+            [data writeToFile:[fileURL path] atomically:YES];
+            dispatch_semaphore_signal(waitForAssetToBeWritten);
+        }
+                     failureBlock:^(NSError *err) {
+                         fileURL = nil;
+                         NSLog(@"Error: %@",[err localizedDescription]);
+                         dispatch_semaphore_signal(waitForAssetToBeWritten);
+                     }
+         ];
+    });
+    
+    dispatch_semaphore_wait(waitForAssetToBeWritten, DISPATCH_TIME_FOREVER);
     return fileURL;
 }
 
