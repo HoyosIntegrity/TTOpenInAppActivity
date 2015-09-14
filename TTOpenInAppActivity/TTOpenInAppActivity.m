@@ -35,13 +35,9 @@
 
 + (NSBundle *)bundle
 {
-    NSBundle *bundle;
-    NSURL *openInAppActivityBundleURL = [[NSBundle mainBundle] URLForResource:@"TTOpenInAppActivity" withExtension:@"bundle"];
+    NSBundle *bundle = [NSBundle bundleForClass:self];
 
-    if (openInAppActivityBundleURL) {
-        // TTOpenInAppActivity.bundle will likely only exist when used via CocoaPods
-        bundle = [NSBundle bundleWithURL:openInAppActivityBundleURL];
-    } else {
+    if (!bundle) {
         bundle = [NSBundle mainBundle];
     }
 
@@ -79,11 +75,11 @@
 - (UIImage *)activityImage
 {
     if([[[UIDevice currentDevice] systemVersion] floatValue] >= 8.0){
-        return [UIImage imageNamed:@"TTOpenInAppActivity8"];
+        return [UIImage imageNamed:@"TTOpenInAppActivity8" inBundle:[TTOpenInAppActivity bundle] compatibleWithTraitCollection:nil];
     } else if([[[UIDevice currentDevice] systemVersion] floatValue] >= 7.0){
-        return [UIImage imageNamed:@"TTOpenInAppActivity7"];
+        return [UIImage imageNamed:@"TTOpenInAppActivity7" inBundle:[TTOpenInAppActivity bundle] compatibleWithTraitCollection:nil];
     } else {
-        return [UIImage imageNamed:@"TTOpenInAppActivity"];
+        return [UIImage imageNamed:@"TTOpenInAppActivity" inBundle:[TTOpenInAppActivity bundle] compatibleWithTraitCollection:nil];
     }
 }
 

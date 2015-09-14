@@ -12,8 +12,7 @@ Pod::Spec.new do |s|
   s.authors          = { 'Tobias Tiemerding' => 'http://www.tiemerding.com' }
   s.source           = { :git => 'https://github.com/honkmaster/TTOpenInAppActivity.git', :tag => '1.1' }
   s.source_files     = 'TTOpenInAppActivity/*.{h,m}'
-  s.resources        = 'TTOpenInAppActivity/*.png'
-  s.resource_bundles = { 'TTOpenInAppActivity' => ['bundles/*.lproj'] }
+  s.resources        = 'TTOpenInAppActivity/*.png', 'bundles/*.lproj' 
   s.frameworks       = 'UIKit', 'MobileCoreServices', 'Coregraphics', 'ImageIO', 'Foundation'
   s.requires_arc     = true
   s.platform         = :ios, '6.0'
